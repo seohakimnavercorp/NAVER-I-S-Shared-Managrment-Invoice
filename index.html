@@ -267,6 +267,13 @@
     padding: 4px 10px;
     border-radius: 6px;
   }
+
+  .company-tag {
+    font-size: 22px;
+    font-weight: 700;
+    color: #888;
+    margin-right: 6px;
+  }
 </style>
 </head>
 <body>
@@ -304,7 +311,7 @@
 
   <div class="main">
     <div class="page-header">
-      <h1>청구서 목록</h1>
+      <h1><span class="company-tag" id="company-tag"></span>청구서 목록</h1>
       <p>등록된 거래명세서를 최신순으로 확인하세요</p>
     </div>
 
@@ -377,6 +384,17 @@ async function showDashboard(user) {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('dashboard-screen').style.display = 'block';
   document.getElementById('user-email').textContent = user.email;
+
+  // 로그인한 유저의 회사명 가져오기
+  const { data: userData } = await sb
+    .from('Users')
+    .select('company_id, Companies(회사명)')
+    .eq('auth_id', user.id)
+    .single();
+
+  if (userData && userData.Companies && userData.Companies['회사명']) {
+    document.getElementById('company-tag').textContent = `[${userData.Companies['회사명']}] `;
+  }
 
   await loadInvoices();
 }
