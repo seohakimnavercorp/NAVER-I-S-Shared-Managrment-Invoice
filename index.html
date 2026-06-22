@@ -415,4 +415,237 @@
       <!-- 직접비 상세내역 섹션 -->
       <div id="section-direct-detail" class="content-section">
         <div class="page-header">
-          <h1><span class="company-tag3"></span>직접
+          <h1><span class="company-tag3"></span>직접비 상세내역</h1>
+          <p>직접비 항목별 상세 내역을 확인하세요</p>
+        </div>
+        <div class="table-wrap">
+          <div class="loading" id="loading-direct-detail">불러오는 중...</div>
+          <table id="direct-detail-table" style="display:none">
+            <thead>
+              <tr>
+                <th>연도</th>
+                <th>월</th>
+                <th>직접비코드</th>
+                <th>서비스</th>
+                <th>직접비항목</th>
+                <th>청구유형</th>
+                <th>배부기준</th>
+                <th>청구법인</th>
+                <th style="text-align:right">금액</th>
+              </tr>
+            </thead>
+            <tbody id="direct-detail-body"></tbody>
+          </table>
+          <div class="empty-state" id="empty-direct-detail" style="display:none">등록된 상세내역이 없습니다</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://mjudvolcvvedsgutpdnz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_JHuaac3MqEOdIkxtikIneQ_XsDsZOeA';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentCompanyId = null;
+
+window.onload = async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) showDashboard(session.user);
+};
+
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('error-msg');
+
+  if (!email || !password) { showError('이메일과 비밀번호를 입력해주세요'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '로그인 중...';
+  errEl.style.display = 'none';
+
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    showError('이메일 또는 비밀번호가 올바르지 않습니다');
+    btn.disabled = false;
+    btn.textContent = '로그인';
+    return;
+  }
+
+  showDashboard(data.user);
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function showDashboard(user) {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('dashboard-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = user.email;
+
+  const { data: userData } = await sb
+    .from('Users')
+    .select('company_id, Companies(회사명)')
+    .eq('auth_id', user.id)
+    .single();
+
+  if (userData && userData.Companies && userData.Companies['회사명']) {
+    const companyName = `[${userData.Companies['회사명']}] `;
+    document.getElementById('company-tag').textContent = companyName;
+    document.getElementById('topbar-company').textContent = companyName;
+    document.querySelectorAll('.company-tag2, .company-tag3').forEach(el => el.textContent = companyName);
+    currentCompanyId = userData.company_id;
+  }
+
+  await loadInvoices();
+}
+
+function showSection(name) {
+  document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+
+  document.getElementById(`section-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+
+  if (name === 'direct') loadDirect();
+  if (name === 'direct-detail') loadDirectDetail();
+}
+
+async function loadInvoices() {
+  document.getElementById('loading-invoice').style.display = 'block';
+  document.getElementById('invoice-table').style.display = 'none';
+  document.getElementById('empty-invoice').style.display = 'none';
+
+  const { data, error } = await sb
+    .from('청구서')
+    .select('*')
+    .order('일자', { ascending: false });
+
+  document.getElementById('loading-invoice').style.display = 'none';
+
+  if (error || !data || data.length === 0) {
+    document.getElementById('empty-invoice').style.display = 'block';
+    return;
+  }
+
+  const tbody = document.getElementById('invoice-body');
+  tbody.innerHTML = '';
+
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    const downloadBtn = row['URL']
+      ? `<a class="btn-download" href="${row['URL']}" target="_blank">↓ 다운로드</a>`
+      : `<button class="btn-no-url" disabled>파일 없음</button>`;
+
+    tr.innerHTML = `
+      <td>${row['일자'] || '-'}</td>
+      <td>${row['파일명'] || '-'}</td>
+      <td>${row['비고'] || '-'}</td>
+      <td>${downloadBtn}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('invoice-table').style.display = 'table';
+}
+
+async function loadDirect() {
+  document.getElementById('loading-direct').style.display = 'block';
+  document.getElementById('direct-table').style.display = 'none';
+  document.getElementById('empty-direct').style.display = 'none';
+
+  const { data, error } = await sb
+    .from('직접비')
+    .select('연도, 경상월, 청구유형, 서비스, 금액')
+    .order('연도', { ascending: true })
+    .order('경상월', { ascending: true });
+
+  document.getElementById('loading-direct').style.display = 'none';
+
+  if (error || !data || data.length === 0) {
+    document.getElementById('empty-direct').style.display = 'block';
+    return;
+  }
+
+  const tbody = document.getElementById('direct-body');
+  tbody.innerHTML = '';
+
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row['연도'] || '-'}</td>
+      <td>${row['경상월'] || '-'}</td>
+      <td>${row['청구유형'] || '-'}</td>
+      <td>${row['서비스'] || '-'}</td>
+      <td class="amount">${row['금액'] ? row['금액'].toLocaleString() + '원' : '-'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('direct-table').style.display = 'table';
+}
+
+async function loadDirectDetail() {
+  document.getElementById('loading-direct-detail').style.display = 'block';
+  document.getElementById('direct-detail-table').style.display = 'none';
+  document.getElementById('empty-direct-detail').style.display = 'none';
+
+  const { data, error } = await sb
+    .from('직접비')
+    .select('*')
+    .order('연도', { ascending: true })
+    .order('경상월', { ascending: true });
+
+  document.getElementById('loading-direct-detail').style.display = 'none';
+
+  if (error || !data || data.length === 0) {
+    document.getElementById('empty-direct-detail').style.display = 'block';
+    return;
+  }
+
+  const tbody = document.getElementById('direct-detail-body');
+  tbody.innerHTML = '';
+
+  data.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${row['연도'] || '-'}</td>
+      <td>${row['경상월'] || '-'}</td>
+      <td>${row['직접비코드'] || '-'}</td>
+      <td>${row['서비스'] || '-'}</td>
+      <td>${row['직접비항목'] || '-'}</td>
+      <td>${row['청구유형'] || '-'}</td>
+      <td>${row['배부기준'] || '-'}</td>
+      <td>${row['청구법인'] || '-'}</td>
+      <td class="amount">${row['금액'] ? row['금액'].toLocaleString() + '원' : '-'}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('direct-detail-table').style.display = 'table';
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  document.getElementById('dashboard-screen').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('email').value = '';
+  document.getElementById('password').value = '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') login();
+});
+</script>
+</body>
+</html>
