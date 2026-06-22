@@ -131,10 +131,7 @@
     gap: 16px;
   }
 
-  .user-badge {
-    font-size: 13px;
-    color: #666;
-  }
+  .user-badge { font-size: 13px; color: #666; }
 
   .btn-logout {
     padding: 7px 14px;
@@ -155,7 +152,6 @@
     min-height: calc(100vh - 56px);
   }
 
-  /* 사이드바 */
   .sidebar {
     width: 220px;
     background: #fff;
@@ -167,10 +163,7 @@
     overflow-y: auto;
   }
 
-  .sidebar-section {
-    padding: 0 16px;
-    margin-bottom: 8px;
-  }
+  .sidebar-section { padding: 0 16px; margin-bottom: 8px; }
 
   .sidebar-label {
     font-size: 11px;
@@ -198,11 +191,8 @@
   .sidebar-item:hover { background: #f5f5f5; color: #111; }
   .sidebar-item.active { background: #1a1a1a; color: #fff; font-weight: 600; }
 
-  .sidebar-sub {
-    padding-left: 20px;
-  }
+  .sidebar-sub { padding-left: 20px; }
 
-  /* 메인 콘텐츠 */
   .main {
     margin-left: 220px;
     flex: 1;
@@ -218,10 +208,7 @@
     margin-bottom: 4px;
   }
 
-  .page-header p {
-    font-size: 14px;
-    color: #888;
-  }
+  .page-header p { font-size: 14px; color: #888; }
 
   .table-wrap {
     background: #fff;
@@ -230,10 +217,7 @@
     box-shadow: 0 1px 8px rgba(0,0,0,0.06);
   }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
+  table { width: 100%; border-collapse: collapse; }
 
   thead {
     background: #fafafa;
@@ -309,13 +293,36 @@
     margin-right: 6px;
   }
 
-  .amount {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-  }
+  .amount { text-align: right; font-variant-numeric: tabular-nums; }
 
   .content-section { display: none; }
   .content-section.active { display: block; }
+
+  /* 페이지네이션 */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 20px;
+  }
+
+  .page-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    background: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    color: #444;
+    transition: all 0.15s;
+  }
+
+  .page-btn:hover { border-color: #1a1a1a; color: #1a1a1a; }
+  .page-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; font-weight: 600; }
+  .page-btn:disabled { color: #ccc; border-color: #eee; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -350,22 +357,20 @@
   </div>
 
   <div class="layout">
-    <!-- 사이드바 -->
     <div class="sidebar">
       <div class="sidebar-section">
         <div class="sidebar-label">메뉴</div>
-        <button class="sidebar-item active" onclick="showSection('invoice')">📄 용역비</button>
-        <button class="sidebar-item" onclick="showSection('direct')">💰 직접비</button>
+        <button class="sidebar-item active" onclick="showSection('invoice', this)">📄 용역비</button>
+        <button class="sidebar-item" onclick="showSection('direct', this)">💰 직접비</button>
         <div class="sidebar-sub">
-          <button class="sidebar-item" onclick="showSection('direct-detail')">📋 직접비(상세내역)</button>
+          <button class="sidebar-item" onclick="showSection('direct-detail', this)">📋 직접비(상세내역)</button>
         </div>
       </div>
     </div>
 
-    <!-- 메인 콘텐츠 -->
     <div class="main">
 
-      <!-- 용역비 섹션 -->
+      <!-- 용역비 -->
       <div id="section-invoice" class="content-section active">
         <div class="page-header">
           <h1><span class="company-tag" id="company-tag"></span>청구서 목록</h1>
@@ -385,13 +390,14 @@
             <tbody id="invoice-body"></tbody>
           </table>
           <div class="empty-state" id="empty-invoice" style="display:none">등록된 청구서가 없습니다</div>
+          <div class="pagination" id="invoice-pagination"></div>
         </div>
       </div>
 
-      <!-- 직접비 섹션 -->
+      <!-- 직접비 -->
       <div id="section-direct" class="content-section">
         <div class="page-header">
-          <h1><span class="company-tag2"></span>직접비 월별 현황</h1>
+          <h1><span class="company-tag" ></span>직접비 월별 현황</h1>
           <p>월별 직접비 금액을 확인하세요</p>
         </div>
         <div class="table-wrap">
@@ -412,10 +418,10 @@
         </div>
       </div>
 
-      <!-- 직접비 상세내역 섹션 -->
+      <!-- 직접비 상세 -->
       <div id="section-direct-detail" class="content-section">
         <div class="page-header">
-          <h1><span class="company-tag3"></span>직접비 상세내역</h1>
+          <h1><span class="company-tag"></span>직접비 상세내역</h1>
           <p>직접비 항목별 상세 내역을 확인하세요</p>
         </div>
         <div class="table-wrap">
@@ -451,7 +457,9 @@ const SUPABASE_ANON_KEY = 'sb_publishable_JHuaac3MqEOdIkxtikIneQ_XsDsZOeA';
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let currentCompanyId = null;
+const PAGE_SIZE = 5;
+let allInvoices = [];
+let currentPage = 1;
 
 window.onload = async () => {
   const { data: { session } } = await sb.auth.getSession();
@@ -490,162 +498,4 @@ function showError(msg) {
 
 async function showDashboard(user) {
   document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('dashboard-screen').style.display = 'block';
-  document.getElementById('user-email').textContent = user.email;
-
-  const { data: userData } = await sb
-    .from('Users')
-    .select('company_id, Companies(회사명)')
-    .eq('auth_id', user.id)
-    .single();
-
-  if (userData && userData.Companies && userData.Companies['회사명']) {
-    const companyName = `[${userData.Companies['회사명']}] `;
-    document.getElementById('company-tag').textContent = companyName;
-    document.getElementById('topbar-company').textContent = companyName;
-    document.querySelectorAll('.company-tag2, .company-tag3').forEach(el => el.textContent = companyName);
-    currentCompanyId = userData.company_id;
-  }
-
-  await loadInvoices();
-}
-
-function showSection(name) {
-  document.querySelectorAll('.content-section').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
-
-  document.getElementById(`section-${name}`).classList.add('active');
-  event.currentTarget.classList.add('active');
-
-  if (name === 'direct') loadDirect();
-  if (name === 'direct-detail') loadDirectDetail();
-}
-
-async function loadInvoices() {
-  document.getElementById('loading-invoice').style.display = 'block';
-  document.getElementById('invoice-table').style.display = 'none';
-  document.getElementById('empty-invoice').style.display = 'none';
-
-  const { data, error } = await sb
-    .from('청구서')
-    .select('*')
-    .order('일자', { ascending: false });
-
-  document.getElementById('loading-invoice').style.display = 'none';
-
-  if (error || !data || data.length === 0) {
-    document.getElementById('empty-invoice').style.display = 'block';
-    return;
-  }
-
-  const tbody = document.getElementById('invoice-body');
-  tbody.innerHTML = '';
-
-  data.forEach(row => {
-    const tr = document.createElement('tr');
-    const downloadBtn = row['URL']
-      ? `<a class="btn-download" href="${row['URL']}" target="_blank">↓ 다운로드</a>`
-      : `<button class="btn-no-url" disabled>파일 없음</button>`;
-
-    tr.innerHTML = `
-      <td>${row['일자'] || '-'}</td>
-      <td>${row['파일명'] || '-'}</td>
-      <td>${row['비고'] || '-'}</td>
-      <td>${downloadBtn}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('invoice-table').style.display = 'table';
-}
-
-async function loadDirect() {
-  document.getElementById('loading-direct').style.display = 'block';
-  document.getElementById('direct-table').style.display = 'none';
-  document.getElementById('empty-direct').style.display = 'none';
-
-  const { data, error } = await sb
-    .from('직접비')
-    .select('연도, 경상월, 청구유형, 서비스, 금액')
-    .order('연도', { ascending: true })
-    .order('경상월', { ascending: true });
-
-  document.getElementById('loading-direct').style.display = 'none';
-
-  if (error || !data || data.length === 0) {
-    document.getElementById('empty-direct').style.display = 'block';
-    return;
-  }
-
-  const tbody = document.getElementById('direct-body');
-  tbody.innerHTML = '';
-
-  data.forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${row['연도'] || '-'}</td>
-      <td>${row['경상월'] || '-'}</td>
-      <td>${row['청구유형'] || '-'}</td>
-      <td>${row['서비스'] || '-'}</td>
-      <td class="amount">${row['금액'] ? row['금액'].toLocaleString() + '원' : '-'}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('direct-table').style.display = 'table';
-}
-
-async function loadDirectDetail() {
-  document.getElementById('loading-direct-detail').style.display = 'block';
-  document.getElementById('direct-detail-table').style.display = 'none';
-  document.getElementById('empty-direct-detail').style.display = 'none';
-
-  const { data, error } = await sb
-    .from('직접비')
-    .select('*')
-    .order('연도', { ascending: true })
-    .order('경상월', { ascending: true });
-
-  document.getElementById('loading-direct-detail').style.display = 'none';
-
-  if (error || !data || data.length === 0) {
-    document.getElementById('empty-direct-detail').style.display = 'block';
-    return;
-  }
-
-  const tbody = document.getElementById('direct-detail-body');
-  tbody.innerHTML = '';
-
-  data.forEach(row => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${row['연도'] || '-'}</td>
-      <td>${row['경상월'] || '-'}</td>
-      <td>${row['직접비코드'] || '-'}</td>
-      <td>${row['서비스'] || '-'}</td>
-      <td>${row['직접비항목'] || '-'}</td>
-      <td>${row['청구유형'] || '-'}</td>
-      <td>${row['배부기준'] || '-'}</td>
-      <td>${row['청구법인'] || '-'}</td>
-      <td class="amount">${row['금액'] ? row['금액'].toLocaleString() + '원' : '-'}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById('direct-detail-table').style.display = 'table';
-}
-
-async function logout() {
-  await sb.auth.signOut();
-  document.getElementById('dashboard-screen').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('email').value = '';
-  document.getElementById('password').value = '';
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'Enter') login();
-});
-</script>
-</body>
-</html>
+  document.getElementById('dashboard-scree
